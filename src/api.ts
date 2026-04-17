@@ -12,6 +12,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Auto-logout on expired / invalid token
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const login = async (email: string, password: string): Promise<string> => {
   const res = await api.post('/login', { email, password });
   return res.data.token;

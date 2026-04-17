@@ -91,12 +91,16 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie data={categoryData} dataKey="value" nameKey="name"
-                   cx="50%" cy="50%" outerRadius={100} label={({ name }) => name}>
+                   cx="50%" cy="50%" outerRadius={100}
+                   label={({ name, x, y }) => (
+                     <text x={x} y={y} fill="#000000" textAnchor="middle"
+                           dominantBaseline="central" fontSize={12}>{name}</text>
+                   )}>
                 {categoryData.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: number) => `$${v.toFixed(2)}`} />
+              <Tooltip formatter={(v) => typeof v === 'number' ? `$${v.toFixed(2)}` : v} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -105,9 +109,9 @@ export default function Dashboard() {
           <h2>Monthly spending</h2>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={monthData}>
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(v: number) => `$${v.toFixed(2)}`} />
+              <XAxis dataKey="name" tick={{ fill: '#000000' }} />
+              <YAxis tick={{ fill: '#000000' }} />
+              <Tooltip formatter={(v) => typeof v === 'number' ? `$${v.toFixed(2)}` : v} />
               <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -186,7 +190,7 @@ export default function Dashboard() {
         <div className="chart-box" style={{ marginTop: '1.5rem' }}>
           <h2>AI Insights</h2>
           <p style={{ color: '#64748b', fontSize: 14, marginTop: '0.5rem' }}>
-            Set <code>GEMINI_API_KEY</code> on the backend to enable AI tips.
+            Set <code>ANTHROPIC_API_KEY</code> on the backend to enable AI tips.
           </p>
         </div>
       )}

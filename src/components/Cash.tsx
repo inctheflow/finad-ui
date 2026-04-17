@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { getCashEntries, addCashEntry, deleteCashEntry } from '../api';
-import type { CashEntry, CashResponse } from '../types';
+import type { CashResponse } from '../types';
 
 export default function Cash() {
   const [data, setData]           = useState<CashResponse | null>(null);
