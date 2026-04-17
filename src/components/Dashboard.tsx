@@ -1,35 +1,37 @@
 import { useEffect, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-import { getTransactions } from '../api';
-import type { Transaction } from '../types';
+import { getTransactions, getAnalytics } from '../api';
+import type { Transaction, AnalyticsData } from '../types';
 
-// recharts needs data as {name, value} objects
-interface ChartData {
-  name: string;
-  value: number;
-}
+interface ChartData { name: string; value: number; }
 
-// category colors for the pie chart
 const COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#3b82f6',
                  '#ec4899','#14b8a6','#f97316','#8b5cf6','#06b6d4'];
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading]           = useState(true);
+  const [analytics, setAnalytics]       = useState<AnalyticsData | null>(null);
+  const [txLoading, setTxLoading]       = useState(true);
+  const [aiLoading, setAiLoading]       = useState(true);
   const [error, setError]               = useState('');
 
-  // useEffect with [] runs once when component first mounts
   useEffect(() => {
     getTransactions()
       .then(setTransactions)
       .catch(() => setError('Failed to load transactions'))
-      .finally(() => setLoading(false));
+      .finally(() => setTxLoading(false));
   }, []);
 
-  if (loading) return <div className="page"><p>Loading...</p></div>;
-  if (error)   return <div className="page"><p className="error">{error}</p></div>;
+  useEffect(() => {
+    getAnalytics()
+      .then(setAnalytics)
+      .catch(() => {}) // fails silently if GEMINI_API_KEY not set
+      .finally(() => setAiLoading(false));
+  }, []);
 
-  // compute category totals from raw transactions
+  if (txLoading) return <div className="page"><p>Loading…</p></div>;
+  if (error)     return <div className="page"><p className="error">{error}</p></div>;
+
   const categoryMap = transactions.reduce((acc, t) => {
     acc[t.category] = (acc[t.category] || 0) + t.amount;
     return acc;
@@ -39,9 +41,7 @@ export default function Dashboard() {
     .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => b.value - a.value);
 
-  // compute monthly totals
   const monthMap = transactions.reduce((acc, t) => {
-    // convert MM/DD/YYYY to YYYY-MM for grouping
     const [month, , year] = t.date.split('/');
     const key = `${year}-${month}`;
     acc[key] = (acc[key] || 0) + t.amount;
@@ -58,8 +58,8 @@ export default function Dashboard() {
     <div className="page">
       <h1>Dashboard</h1>
 
-      {/* stat cards */}
-      <div className="stats">
+      {/* ── Stat cards ─────────────────────────────────────────────── */}
+      <div className="stats" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="stat-card">
           <div className="stat-label">Total transactions</div>
           <div className="stat-value">{transactions.length}</div>
@@ -72,21 +72,31 @@ export default function Dashboard() {
           <div className="stat-label">Categories</div>
           <div className="stat-value">{categoryData.length}</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-label">Monthly average</div>
+          <div className="stat-value">
+            {aiLoading
+              ? '…'
+              : analytics
+              ? `$${analytics.monthly_average.toFixed(2)}`
+              : '—'}
+          </div>
+        </div>
       </div>
 
-      {/* charts side by side */}
+      {/* ── Charts ─────────────────────────────────────────────────── */}
       <div className="charts">
         <div className="chart-box">
           <h2>Spending by category</h2>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie data={categoryData} dataKey="value" nameKey="name"
-                   cx="50%" cy="50%" outerRadius={100} label={({name}) => name}>
+                   cx="50%" cy="50%" outerRadius={100} label={({ name }) => name}>
                 {categoryData.map((_, i) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(v: any) => `$${v.toFixed(2)}`} />
+              <Tooltip formatter={(v: number) => `$${v.toFixed(2)}`} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -97,12 +107,89 @@ export default function Dashboard() {
             <BarChart data={monthData}>
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip formatter={(v: any) => `$${v.toFixed(2)}`} />
-              <Bar dataKey="value" fill="#6366f1" radius={[4,4,0,0]} />
+              <Tooltip formatter={(v: number) => `$${v.toFixed(2)}`} />
+              <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
+
+      {/* ── Top expenses ───────────────────────────────────────────── */}
+      {analytics && analytics.top_expenses.length > 0 && (
+        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
+          <h2>Top expenses</h2>
+          <table className="tx-table" style={{ marginTop: '0.75rem' }}>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {analytics.top_expenses.map((e, i) => (
+                <tr key={i}>
+                  <td>{e.date}</td>
+                  <td className="desc-cell">{e.description}</td>
+                  <td><span className={`badge badge-${e.category}`}>{e.category}</span></td>
+                  <td className="amount">${e.amount.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── AI tips ────────────────────────────────────────────────── */}
+      {aiLoading && (
+        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
+          <h2>AI Insights</h2>
+          <p style={{ color: '#64748b', fontSize: 14, marginTop: '0.5rem' }}>
+            Generating personalised tips…
+          </p>
+        </div>
+      )}
+
+      {!aiLoading && analytics && analytics.tips.length > 0 && (
+        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
+          <h2>AI Insights</h2>
+          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {analytics.tips.map((tip, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                gap: '0.75rem',
+                padding: '0.875rem 1rem',
+                background: '#f8fafc',
+                borderRadius: 8,
+                border: '1px solid #e2e8f0',
+              }}>
+                <span style={{
+                  flexShrink: 0,
+                  width: 24, height: 24,
+                  background: '#6366f1',
+                  color: 'white',
+                  borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700,
+                }}>
+                  {i + 1}
+                </span>
+                <p style={{ margin: 0, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{tip}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!aiLoading && !analytics && (
+        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
+          <h2>AI Insights</h2>
+          <p style={{ color: '#64748b', fontSize: 14, marginTop: '0.5rem' }}>
+            Set <code>GEMINI_API_KEY</code> on the backend to enable AI tips.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
