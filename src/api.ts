@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Transaction, UploadResponse, AnalyticsData, CashResponse } from './types';
+import type { Transaction, UploadResponse, AnalyticsData, CashResponse, AccountInfo } from './types';
 
 const api = axios.create({ baseURL: 'http://localhost:3000' });
 
@@ -72,4 +72,29 @@ export const addCashEntry = async (
 
 export const deleteCashEntry = async (id: number): Promise<void> => {
   await api.delete(`/cash/${id}`);
+};
+
+export const sendChatMessage = async (message: string): Promise<string> => {
+  const res = await api.post('/chat', { message });
+  return res.data.reply;
+};
+
+export const getAccount = async (): Promise<AccountInfo> => {
+  const res = await api.get('/account');
+  return res.data;
+};
+
+export const updateAccount = async (data: {
+  phone?: string;
+  security_question?: string;
+  security_answer?: string;
+}): Promise<void> => {
+  await api.put('/account', data);
+};
+
+export const changePassword = async (
+  current_password: string,
+  new_password: string,
+): Promise<void> => {
+  await api.put('/account/password', { current_password, new_password });
 };

@@ -5,9 +5,11 @@ import Dashboard    from './components/Dashboard';
 import Summary      from './components/Summary';
 import Transactions from './components/Transactions';
 import Cash         from './components/Cash';
+import Chat         from './components/Chat';
+import Account      from './components/Account';
 import './App.css';
 
-type Page = 'dashboard' | 'transactions' | 'summary' | 'upload' | 'cash';
+type Page = 'dashboard' | 'transactions' | 'summary' | 'upload' | 'cash' | 'chat' | 'account';
 
 const NAV_LABELS: Record<Page, string> = {
   dashboard:    'Dashboard',
@@ -15,6 +17,8 @@ const NAV_LABELS: Record<Page, string> = {
   summary:      'Summary',
   upload:       'Upload',
   cash:         'Cash',
+  chat:         'AI Chat',
+  account:      'Account',
 };
 
 export default function App() {
@@ -23,8 +27,8 @@ export default function App() {
   );
   const [page, setPage] = useState<Page>('dashboard');
 
-  const handleAuth    = (t: string) => setToken(t);
-  const handleLogout  = () => { localStorage.removeItem('token'); setToken(null); };
+  const handleAuth   = (t: string) => { setToken(t); setPage('dashboard'); };
+  const handleLogout = () => { localStorage.removeItem('token'); setToken(null); };
 
   if (!token) return <Auth onAuth={handleAuth} />;
 
@@ -52,6 +56,8 @@ export default function App() {
         {page === 'summary'      && <Summary />}
         {page === 'upload'       && <Upload />}
         {page === 'cash'         && <Cash />}
+        {page === 'chat'         && <Chat />}
+        {page === 'account'      && <Account />}
       </main>
     </div>
   );

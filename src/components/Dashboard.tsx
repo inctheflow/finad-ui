@@ -12,7 +12,6 @@ export default function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [analytics, setAnalytics]       = useState<AnalyticsData | null>(null);
   const [txLoading, setTxLoading]       = useState(true);
-  const [aiLoading, setAiLoading]       = useState(true);
   const [error, setError]               = useState('');
 
   useEffect(() => {
@@ -25,8 +24,7 @@ export default function Dashboard() {
   useEffect(() => {
     getAnalytics()
       .then(setAnalytics)
-      .catch(() => {}) // fails silently if GEMINI_API_KEY not set
-      .finally(() => setAiLoading(false));
+      .catch(() => {});
   }, []);
 
   if (txLoading) return <div className="page"><p>Loading…</p></div>;
@@ -75,11 +73,7 @@ export default function Dashboard() {
         <div className="stat-card">
           <div className="stat-label">Monthly average</div>
           <div className="stat-value">
-            {aiLoading
-              ? '…'
-              : analytics
-              ? `$${analytics.monthly_average.toFixed(2)}`
-              : '—'}
+            {analytics ? `$${analytics.monthly_average.toFixed(2)}` : '—'}
           </div>
         </div>
       </div>
@@ -145,55 +139,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── AI tips ────────────────────────────────────────────────── */}
-      {aiLoading && (
-        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
-          <h2>AI Insights</h2>
-          <p style={{ color: '#64748b', fontSize: 14, marginTop: '0.5rem' }}>
-            Generating personalised tips…
-          </p>
-        </div>
-      )}
-
-      {!aiLoading && analytics && analytics.tips.length > 0 && (
-        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
-          <h2>AI Insights</h2>
-          <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            {analytics.tips.map((tip, i) => (
-              <div key={i} style={{
-                display: 'flex',
-                gap: '0.75rem',
-                padding: '0.875rem 1rem',
-                background: '#f8fafc',
-                borderRadius: 8,
-                border: '1px solid #e2e8f0',
-              }}>
-                <span style={{
-                  flexShrink: 0,
-                  width: 24, height: 24,
-                  background: '#6366f1',
-                  color: 'white',
-                  borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, fontWeight: 700,
-                }}>
-                  {i + 1}
-                </span>
-                <p style={{ margin: 0, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{tip}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!aiLoading && !analytics && (
-        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
-          <h2>AI Insights</h2>
-          <p style={{ color: '#64748b', fontSize: 14, marginTop: '0.5rem' }}>
-            Set <code>ANTHROPIC_API_KEY</code> on the backend to enable AI tips.
-          </p>
-        </div>
-      )}
     </div>
   );
 }

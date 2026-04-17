@@ -32,7 +32,17 @@ export interface TopExpense {
 export interface AnalyticsData {
   monthly_average: number;
   top_expenses: TopExpense[];
-  tips: string[];
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface AccountInfo {
+  email: string;
+  phone: string | null;
+  security_question: string | null;
 }
 
 export interface CashEntry {
