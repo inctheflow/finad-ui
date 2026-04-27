@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { Transaction, UploadResponse, AnalyticsData, CashResponse, AccountInfo } from './types';
+import type { Transaction, UploadResponse, AnalyticsData, CashResponse, AccountInfo, TellerAccount, TellerSyncResult } from './types';
 
 const api = axios.create({ baseURL: 'http://localhost:3000' });
 
@@ -97,4 +97,27 @@ export const changePassword = async (
   new_password: string,
 ): Promise<void> => {
   await api.put('/account/password', { current_password, new_password });
+};
+
+export const tellerEnroll = async (
+  access_token: string,
+  enrollment_id: string,
+  institution_name: string,
+): Promise<{ message: string; accounts: number }> => {
+  const res = await api.post('/teller/enroll', { access_token, enrollment_id, institution_name });
+  return res.data;
+};
+
+export const tellerSync = async (): Promise<TellerSyncResult> => {
+  const res = await api.post('/teller/sync');
+  return res.data;
+};
+
+export const getTellerAccounts = async (): Promise<TellerAccount[]> => {
+  const res = await api.get('/teller/accounts');
+  return res.data.accounts;
+};
+
+export const disconnectTellerAccount = async (id: number): Promise<void> => {
+  await api.delete(`/teller/accounts/${id}`);
 };

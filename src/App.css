@@ -173,3 +173,100 @@ input[type="file"]  { display: none; }
 .badge-Others        { background: #f1f5f9; color: #475569; }
 .badge-health        { background: #d1fae5; color: #065f46; }
 .badge-travel        { background: #e0f2fe; color: #0c4a6e; }
+
+/* bank connect page */
+.bank-config { margin-bottom: 1.25rem; }
+.bank-config-label { display: block; font-size: 13px; color: #64748b; margin-bottom: 6px; }
+.bank-config-row { display: flex; align-items: center; gap: 12px; }
+.bank-config-input {
+  flex: 1;
+  max-width: 360px;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+.bank-config-input:focus { border-color: #6366f1; }
+.bank-config-hint { font-size: 13px; color: #6366f1; text-decoration: none; white-space: nowrap; }
+.bank-config-hint:hover { text-decoration: underline; }
+
+.bank-actions { display: flex; gap: 10px; margin-bottom: 1rem; }
+.btn-primary {
+  padding: 10px 20px;
+  background: #6366f1;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover { background: #4f46e5; }
+.btn-secondary {
+  padding: 10px 20px;
+  background: white;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-secondary:hover:not(:disabled) { background: #f8fafc; }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger-sm {
+  padding: 6px 12px;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-danger-sm:hover { background: #fee2e2; }
+
+.bank-list { display: flex; flex-direction: column; gap: 10px; margin-top: 1.25rem; }
+.bank-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bank-card-name { font-size: 15px; font-weight: 600; color: #1e293b; }
+.bank-card-meta { font-size: 13px; color: #64748b; margin-top: 2px; }
+.bank-card-mask { font-family: monospace; }
+.bank-card-right { display: flex; align-items: center; gap: 10px; }
+
+.bank-empty-box {
+  background: white;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+}
+.bank-empty { color: #64748b; font-size: 15px; margin-bottom: 6px; }
+.bank-empty-sub { color: #94a3b8; font-size: 13px; line-height: 1.6; }
+
+.bank-note {
+  margin-top: 1.5rem;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+.bank-note code {
+  background: #e2e8f0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #1e293b;
+}

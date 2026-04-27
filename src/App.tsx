@@ -7,9 +7,10 @@ import Transactions from './components/Transactions';
 import Cash         from './components/Cash';
 import Chat         from './components/Chat';
 import Account      from './components/Account';
+import BankConnect  from './components/BankConnect';
 import './App.css';
 
-type Page = 'dashboard' | 'transactions' | 'summary' | 'upload' | 'cash' | 'chat' | 'account';
+type Page = 'dashboard' | 'transactions' | 'summary' | 'upload' | 'cash' | 'chat' | 'bank' | 'account';
 
 const NAV_LABELS: Record<Page, string> = {
   dashboard:    'Dashboard',
@@ -18,6 +19,7 @@ const NAV_LABELS: Record<Page, string> = {
   upload:       'Upload',
   cash:         'Cash',
   chat:         'AI Chat',
+  bank:         'Banks',
   account:      'Account',
 };
 
@@ -57,6 +59,7 @@ export default function App() {
         {page === 'upload'       && <Upload />}
         {page === 'cash'         && <Cash />}
         {page === 'chat'         && <Chat />}
+        {page === 'bank'         && <BankConnect />}
         {page === 'account'      && <Account />}
       </main>
     </div>

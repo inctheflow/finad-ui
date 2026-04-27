@@ -59,3 +59,16 @@ export interface CashResponse {
   total_expense: number;
   net: number;
 }
+
+export interface TellerAccount {
+  id: number;
+  institution_name: string;
+  account_name: string;
+  account_type: string;
+  last_four: string | null;
+}
+
+export interface TellerSyncResult {
+  message: string;
+  imported: number;
+}
