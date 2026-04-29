@@ -12,13 +12,12 @@ import './App.css';
 
 type Page = 'dashboard' | 'transactions' | 'summary' | 'upload' | 'cash' | 'chat' | 'bank' | 'account';
 
-const NAV_LABELS: Record<Page, string> = {
+const NAV_LABELS: Partial<Record<Page, string>> = {
   dashboard:    'Dashboard',
   transactions: 'Transactions',
   summary:      'Summary',
   upload:       'Upload',
   cash:         'Cash',
-  chat:         'AI Chat',
   bank:         'Banks',
   account:      'Account',
 };
@@ -53,7 +52,7 @@ export default function App() {
       </nav>
 
       <main>
-        {page === 'dashboard'    && <Dashboard />}
+        {page === 'dashboard'    && <Dashboard onChatOpen={() => setPage('chat')} />}
         {page === 'transactions' && <Transactions />}
         {page === 'summary'      && <Summary />}
         {page === 'upload'       && <Upload />}
