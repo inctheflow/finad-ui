@@ -1,6 +1,5 @@
 import { useState, type ReactElement } from 'react';
 import Auth         from './components/Auth';
-import Upload       from './components/Upload';
 import Dashboard    from './components/Dashboard';
 import Summary      from './components/Summary';
 import Transactions from './components/Transactions';
@@ -10,7 +9,7 @@ import Account      from './components/Account';
 import BankConnect  from './components/BankConnect';
 import './App.css';
 
-type Page = 'dashboard' | 'transactions' | 'summary' | 'upload' | 'cash' | 'chat' | 'bank' | 'account';
+type Page = 'dashboard' | 'transactions' | 'summary' | 'cash' | 'chat' | 'bank' | 'account';
 
 const NAV_ITEMS: { page: Page; label: string; icon: ReactElement }[] = [
   {
@@ -65,17 +64,6 @@ const NAV_ITEMS: { page: Page; label: string; icon: ReactElement }[] = [
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 6v2m0 8v2M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-1 2-2.5 2.5S9 15 9 16.5h6" />
-      </svg>
-    ),
-  },
-  {
-    page: 'upload',
-    label: 'Upload',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-        <polyline points="17 8 12 3 7 8" />
-        <line x1="12" y1="3" x2="12" y2="15" />
       </svg>
     ),
   },
@@ -174,7 +162,6 @@ export default function App() {
         {page === 'dashboard'    && <Dashboard onChatOpen={() => setPage('chat')} />}
         {page === 'transactions' && <Transactions />}
         {page === 'summary'      && <Summary />}
-        {page === 'upload'       && <Upload />}
         {page === 'cash'         && <Cash />}
         {page === 'chat'         && <Chat />}
         {page === 'bank'         && <BankConnect />}

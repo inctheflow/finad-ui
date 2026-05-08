@@ -13,12 +13,16 @@ const COLORS = ['#6366f1','#22c55e','#f59e0b','#ef4444','#3b82f6',
 function collapseSmall(data: ChartData[], threshold = 3): ChartData[] {
   const total = data.reduce((s, d) => s + d.value, 0);
   const main: ChartData[] = [];
-  let others = 0;
+  let collapsed = 0;
   for (const d of data) {
     if ((d.value / total) * 100 >= threshold) main.push(d);
-    else others += d.value;
+    else collapsed += d.value;
   }
-  if (others > 0) main.push({ name: 'Others', value: Math.round(others * 100) / 100 });
+  if (collapsed > 0) {
+    const existing = main.find(d => d.name === 'Others');
+    if (existing) existing.value = Math.round((existing.value + collapsed) * 100) / 100;
+    else main.push({ name: 'Others', value: Math.round(collapsed * 100) / 100 });
+  }
   return main;
 }
 
@@ -27,6 +31,12 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
   const [analytics, setAnalytics]       = useState<AnalyticsData | null>(null);
   const [txLoading, setTxLoading]       = useState(true);
   const [error, setError]               = useState('');
+  const [fromDate, setFromDate]             = useState('');
+  const [toDate, setToDate]                 = useState('');
+  const [selectedCategories, setCategories] = useState<Set<string>>(new Set());
+  const [minAmount, setMinAmount]           = useState('');
+  const [maxAmount, setMaxAmount]           = useState('');
+  const [filterOpen, setFilterOpen]         = useState(false);
 
   useEffect(() => {
     getTransactions()
@@ -44,7 +54,49 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
   if (txLoading) return <div className="page"><p>Loading…</p></div>;
   if (error)     return <div className="page"><p className="error">{error}</p></div>;
 
-  const categoryMap = transactions.reduce((acc, t) => {
+  // Convert MM/DD/YYYY → YYYY-MM-DD for comparison
+  const toIso = (d: string) => {
+    const [m, day, y] = d.split('/');
+    return `${y}-${m.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  };
+
+  const filteredTx = transactions.filter(t => {
+    const iso = toIso(t.date);
+    if (fromDate && iso < fromDate) return false;
+    if (toDate   && iso > toDate)   return false;
+    if (selectedCategories.size > 0 && !selectedCategories.has(t.category)) return false;
+    if (minAmount !== '' && t.amount < parseFloat(minAmount)) return false;
+    if (maxAmount !== '' && t.amount > parseFloat(maxAmount)) return false;
+    return true;
+  });
+
+  // Bounds
+  const allIso = transactions.map(t => toIso(t.date)).sort();
+  const minDate = allIso[0] ?? '';
+  const maxDate = allIso[allIso.length - 1] ?? '';
+
+  const allCategories = Array.from(new Set(transactions.map(t => t.category))).sort();
+
+  const activeFilterCount =
+    (fromDate || toDate ? 1 : 0) +
+    (selectedCategories.size > 0 ? 1 : 0) +
+    (minAmount || maxAmount ? 1 : 0);
+
+  const clearAllFilters = () => {
+    setFromDate(''); setToDate('');
+    setCategories(new Set());
+    setMinAmount(''); setMaxAmount('');
+  };
+
+  const toggleCategory = (cat: string) => {
+    setCategories(prev => {
+      const next = new Set(prev);
+      next.has(cat) ? next.delete(cat) : next.add(cat);
+      return next;
+    });
+  };
+
+  const categoryMap = filteredTx.reduce((acc, t) => {
     acc[t.category] = (acc[t.category] || 0) + t.amount;
     return acc;
   }, {} as Record<string, number>);
@@ -53,7 +105,7 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
     .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => b.value - a.value);
 
-  const monthMap = transactions.reduce((acc, t) => {
+  const monthMap = filteredTx.reduce((acc, t) => {
     const [month, , year] = t.date.split('/');
     const key = `${year}-${month}`;
     acc[key] = (acc[key] || 0) + t.amount;
@@ -64,11 +116,196 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
     .map(([name, value]) => ({ name, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const totalSpent = transactions.reduce((sum, t) => sum + t.amount, 0);
+  const totalSpent = filteredTx.reduce((sum, t) => sum + t.amount, 0);
 
   return (
     <div className="page" style={{ paddingBottom: '1.5rem' }}>
-      <h1>Dashboard</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+        <h1 style={{ margin: 0 }}>Dashboard</h1>
+        <button
+          onClick={() => setFilterOpen(o => !o)}
+          title="Filters"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.45rem',
+            padding: '0.45rem 0.9rem',
+            border: `1.5px solid ${activeFilterCount > 0 ? '#6366f1' : '#e2e8f0'}`,
+            borderRadius: '8px',
+            fontSize: '0.82rem',
+            fontWeight: 600,
+            color: activeFilterCount > 0 ? '#6366f1' : '#475569',
+            background: activeFilterCount > 0 ? '#eef2ff' : '#f8fafc',
+            cursor: 'pointer',
+            transition: 'all 0.15s',
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          Filters
+          {activeFilterCount > 0 && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '18px', height: '18px', borderRadius: '50%',
+              background: '#6366f1', color: '#fff',
+              fontSize: '0.7rem', fontWeight: 700, flexShrink: 0,
+            }}>
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Filter panel ───────────────────────────────────────────── */}
+      {filterOpen && (
+        <div style={{
+          padding: '1rem 1.1rem',
+          background: '#f8fafc',
+          border: '1.5px solid #e2e8f0',
+          borderRadius: '12px',
+          marginBottom: '1.25rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1rem',
+        }}>
+
+          {/* Date range */}
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+              Date range
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>From</label>
+                <input
+                  type="date"
+                  value={fromDate}
+                  min={minDate}
+                  max={toDate || maxDate}
+                  onChange={e => setFromDate(e.target.value)}
+                  style={{ padding: '0.38rem 0.6rem', border: '1.5px solid #c7d2fe', borderRadius: '8px', fontSize: '0.875rem', color: '#1e293b', background: '#fff', cursor: 'pointer', outline: 'none' }}
+                />
+              </div>
+              <span style={{ color: '#94a3b8' }}>—</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>To</label>
+                <input
+                  type="date"
+                  value={toDate}
+                  min={fromDate || minDate}
+                  max={maxDate}
+                  onChange={e => setToDate(e.target.value)}
+                  style={{ padding: '0.38rem 0.6rem', border: '1.5px solid #c7d2fe', borderRadius: '8px', fontSize: '0.875rem', color: '#1e293b', background: '#fff', cursor: 'pointer', outline: 'none' }}
+                />
+              </div>
+              {(fromDate || toDate) && (
+                <button onClick={() => { setFromDate(''); setToDate(''); }}
+                  style={{ padding: '0.35rem 0.7rem', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '0.78rem', fontWeight: 600, color: '#64748b', background: '#fff', cursor: 'pointer' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid #e2e8f0' }} />
+
+          {/* Category */}
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+              Category
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {allCategories.map(cat => {
+                const active = selectedCategories.has(cat);
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => toggleCategory(cat)}
+                    style={{
+                      padding: '0.3rem 0.75rem',
+                      borderRadius: '999px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      border: `1.5px solid ${active ? '#6366f1' : '#e2e8f0'}`,
+                      background: active ? '#6366f1' : '#fff',
+                      color: active ? '#fff' : '#475569',
+                      textTransform: 'capitalize',
+                      transition: 'all 0.12s',
+                    }}
+                  >
+                    {cat}
+                  </button>
+                );
+              })}
+              {selectedCategories.size > 0 && (
+                <button onClick={() => setCategories(new Set())}
+                  style={{ padding: '0.3rem 0.7rem', borderRadius: '999px', fontSize: '0.78rem', fontWeight: 600, color: '#64748b', background: '#fff', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div style={{ borderTop: '1px solid #e2e8f0' }} />
+
+          {/* Amount range */}
+          <div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>
+              Amount
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Min $</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={minAmount}
+                  onChange={e => setMinAmount(e.target.value)}
+                  style={{ width: '90px', padding: '0.38rem 0.6rem', border: '1.5px solid #c7d2fe', borderRadius: '8px', fontSize: '0.875rem', color: '#1e293b', background: '#fff', outline: 'none' }}
+                />
+              </div>
+              <span style={{ color: '#94a3b8' }}>—</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: '#475569' }}>Max $</label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="∞"
+                  value={maxAmount}
+                  onChange={e => setMaxAmount(e.target.value)}
+                  style={{ width: '90px', padding: '0.38rem 0.6rem', border: '1.5px solid #c7d2fe', borderRadius: '8px', fontSize: '0.875rem', color: '#1e293b', background: '#fff', outline: 'none' }}
+                />
+              </div>
+              {(minAmount || maxAmount) && (
+                <button onClick={() => { setMinAmount(''); setMaxAmount(''); }}
+                  style={{ padding: '0.35rem 0.7rem', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '0.78rem', fontWeight: 600, color: '#64748b', background: '#fff', cursor: 'pointer' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Divider + footer */}
+          {activeFilterCount > 0 && (
+            <>
+              <div style={{ borderTop: '1px solid #e2e8f0' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 600 }}>
+                  {filteredTx.length} transaction{filteredTx.length !== 1 ? 's' : ''} match
+                </span>
+                <button onClick={clearAllFilters}
+                  style={{ padding: '0.35rem 0.85rem', border: '1.5px solid #fca5a5', borderRadius: '7px', fontSize: '0.8rem', fontWeight: 600, color: '#ef4444', background: '#fff5f5', cursor: 'pointer' }}>
+                  Clear all filters
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── AI Robot banner ────────────────────────────────────────── */}
       <div
@@ -129,7 +366,7 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
       <div className="stats" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="stat-card">
           <div className="stat-label">Total transactions</div>
-          <div className="stat-value">{transactions.length}</div>
+          <div className="stat-value">{filteredTx.length}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Total spent</div>
