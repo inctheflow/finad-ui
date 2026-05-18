@@ -437,8 +437,47 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
         </div>
       </div>
 
-      {/* ── Top expenses ───────────────────────────────────────────── */}
-      {analytics && analytics.top_expenses.length > 0 && (
+      {/* ── Filtered transactions list (shown when filters are active) ── */}
+      {activeFilterCount > 0 && (
+        <div className="chart-box" style={{ marginTop: '1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <h2 style={{ margin: 0 }}>Filtered transactions</h2>
+            <span style={{ fontSize: '0.8rem', color: '#6366f1', fontWeight: 600 }}>
+              {filteredTx.length} result{filteredTx.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          {filteredTx.length === 0 ? (
+            <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: 0 }}>No transactions match the selected filters.</p>
+          ) : (
+            <table className="tx-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTx
+                  .slice()
+                  .sort((a, b) => toIso(b.date).localeCompare(toIso(a.date)))
+                  .map((t, i) => (
+                    <tr key={i}>
+                      <td>{t.date}</td>
+                      <td className="desc-cell">{t.description}</td>
+                      <td><span className={`badge badge-${t.category}`}>{t.category}</span></td>
+                      <td className="amount">${t.amount.toFixed(2)}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* ── Top expenses (shown when no filters are active) ─────────── */}
+      {activeFilterCount === 0 && analytics && analytics.top_expenses.length > 0 && (
         <div className="chart-box" style={{ marginTop: '1.5rem' }}>
           <h2>Top expenses</h2>
           <table className="tx-table" style={{ marginTop: '0.75rem' }}>
