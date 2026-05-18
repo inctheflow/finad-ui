@@ -47,6 +47,7 @@ export default function Cash() {
   };
 
   const handleDelete = async (id: number) => {
+    if (!confirm('Delete this entry? This cannot be undone.')) return;
     try {
       await deleteCashEntry(id);
       load();

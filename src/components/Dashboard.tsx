@@ -37,6 +37,7 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
   const [minAmount, setMinAmount]           = useState('');
   const [maxAmount, setMaxAmount]           = useState('');
   const [filterOpen, setFilterOpen]         = useState(false);
+  const [analyticsError, setAnalyticsError] = useState(false);
 
   useEffect(() => {
     getTransactions()
@@ -48,7 +49,7 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
   useEffect(() => {
     getAnalytics()
       .then(setAnalytics)
-      .catch(() => {});
+      .catch(() => setAnalyticsError(true));
   }, []);
 
   if (txLoading) return <div className="page"><p>Loading…</p></div>;
@@ -379,63 +380,78 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
         <div className="stat-card">
           <div className="stat-label">Monthly average</div>
           <div className="stat-value">
-            {analytics ? `$${analytics.monthly_average.toFixed(2)}` : '—'}
+            {analytics
+              ? `$${analytics.monthly_average.toFixed(2)}`
+              : analyticsError
+                ? <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 500 }}>Failed to load</span>
+                : '—'}
           </div>
         </div>
       </div>
 
       {/* ── Charts ─────────────────────────────────────────────────── */}
-      <div className="charts">
-        <div className="chart-box">
-          <h2>Spending by category</h2>
-          {(() => {
-            const pieData = collapseSmall(categoryData);
-            const total = pieData.reduce((s, d) => s + d.value, 0);
-            return (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                <ResponsiveContainer width={220} height={220}>
-                  <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name"
-                         cx="50%" cy="50%" innerRadius={55} outerRadius={95}
-                         paddingAngle={2} startAngle={90} endAngle={-270}>
-                      {pieData.map((_, i) => (
-                        <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(v) => typeof v === 'number' ? `$${v.toFixed(2)}` : v} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0, flex: 1,
-                             display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 1rem' }}>
-                  {pieData.map((d, i) => (
-                    <li key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                                     background: COLORS[i % COLORS.length] }} />
-                      <span style={{ color: '#64748b', textTransform: 'capitalize', whiteSpace: 'nowrap',
-                                     overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
-                      <span style={{ marginLeft: 'auto', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap' }}>
-                        {((d.value / total) * 100).toFixed(0)}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })()}
+      {filteredTx.length === 0 ? (
+        <div className="charts">
+          {['Spending by category', 'Monthly spending'].map(title => (
+            <div key={title} className="chart-box" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '220px', gap: '0.5rem' }}>
+              <h2 style={{ margin: 0 }}>{title}</h2>
+              <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>No transactions match the selected filters.</p>
+            </div>
+          ))}
         </div>
+      ) : (
+        <div className="charts">
+          <div className="chart-box">
+            <h2>Spending by category</h2>
+            {(() => {
+              const pieData = collapseSmall(categoryData);
+              const total = pieData.reduce((s, d) => s + d.value, 0);
+              return (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+                  <ResponsiveContainer width={220} height={220}>
+                    <PieChart>
+                      <Pie data={pieData} dataKey="value" nameKey="name"
+                           cx="50%" cy="50%" innerRadius={55} outerRadius={95}
+                           paddingAngle={2} startAngle={90} endAngle={-270}>
+                        {pieData.map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} stroke="none" />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(v) => typeof v === 'number' ? `$${v.toFixed(2)}` : v} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0, flex: 1,
+                               display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem 1rem' }}>
+                    {pieData.map((d, i) => (
+                      <li key={d.name} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
+                        <span style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                                       background: COLORS[i % COLORS.length] }} />
+                        <span style={{ color: '#64748b', textTransform: 'capitalize', whiteSpace: 'nowrap',
+                                       overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
+                        <span style={{ marginLeft: 'auto', fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap' }}>
+                          {((d.value / total) * 100).toFixed(0)}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })()}
+          </div>
 
-        <div className="chart-box">
-          <h2>Monthly spending</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={monthData}>
-              <XAxis dataKey="name" tick={{ fill: '#000000' }} />
-              <YAxis tick={{ fill: '#000000' }} />
-              <Tooltip formatter={(v) => typeof v === 'number' ? `$${v.toFixed(2)}` : v} />
-              <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="chart-box">
+            <h2>Monthly spending</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={monthData}>
+                <XAxis dataKey="name" tick={{ fill: '#000000' }} />
+                <YAxis tick={{ fill: '#000000' }} />
+                <Tooltip formatter={(v) => typeof v === 'number' ? `$${v.toFixed(2)}` : v} />
+                <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ── Filtered transactions list (shown when filters are active) ── */}
       {activeFilterCount > 0 && (
