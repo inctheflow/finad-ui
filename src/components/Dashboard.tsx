@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { getTransactions, getAnalytics } from '../api';
 import type { Transaction, AnalyticsData } from '../types';
@@ -38,6 +38,18 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
   const [maxAmount, setMaxAmount]           = useState('');
   const [filterOpen, setFilterOpen]         = useState(false);
   const [analyticsError, setAnalyticsError] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [filterOpen]);
 
   useEffect(() => {
     getTransactions()
@@ -121,7 +133,8 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
 
   return (
     <div className="page" style={{ paddingBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
+      <div ref={filterRef} style={{ marginBottom: '1.25rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ margin: 0 }}>Dashboard</h1>
         <button
           onClick={() => setFilterOpen(o => !o)}
@@ -158,13 +171,14 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
       </div>
 
       {/* ── Filter panel ───────────────────────────────────────────── */}
+
       {filterOpen && (
         <div style={{
           padding: '1rem 1.1rem',
           background: '#f8fafc',
           border: '1.5px solid #e2e8f0',
           borderRadius: '12px',
-          marginBottom: '1.25rem',
+          marginTop: '0.75rem',
           display: 'flex',
           flexDirection: 'column',
           gap: '1rem',
@@ -307,6 +321,7 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
           )}
         </div>
       )}
+      </div>
 
       {/* ── AI Robot banner ────────────────────────────────────────── */}
       <div
@@ -487,6 +502,12 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
                     </tr>
                   ))}
               </tbody>
+              <tfoot>
+                <tr style={{ borderTop: '2px solid #e2e8f0' }}>
+                  <td colSpan={3} style={{ fontWeight: 700, color: '#475569', fontSize: '0.85rem', padding: '0.6rem 0.75rem' }}>Total</td>
+                  <td className="amount" style={{ fontWeight: 700, color: '#1e293b' }}>${totalSpent.toFixed(2)}</td>
+                </tr>
+              </tfoot>
             </table>
           )}
         </div>

@@ -60,9 +60,12 @@ export default function Transactions() {
   if (loading) return <div className="page"><p>Loading...</p></div>;
   if (error)   return <div className="page"><p className="error">{error}</p></div>;
 
+  const q = filter.toLowerCase();
   const filtered = transactions.filter(t =>
-    t.description.toLowerCase().includes(filter.toLowerCase()) ||
-    t.category.toLowerCase().includes(filter.toLowerCase())
+    t.description.toLowerCase().includes(q) ||
+    t.category.toLowerCase().includes(q) ||
+    t.amount.toFixed(2).includes(q) ||
+    t.date.includes(q)
   );
 
   return (
@@ -151,32 +154,51 @@ export default function Transactions() {
       {/* ── Search + count ─────────────────────────────────────── */}
       <input
         className="search"
-        placeholder="Search by description or category..."
+        placeholder="Search by description, category, amount, or date..."
         value={filter}
         onChange={e => setFilter(e.target.value)}
       />
       <p className="subtitle">{filtered.length} of {transactions.length} transactions</p>
 
-      <table className="tx-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Description</th>
-            <th>Category</th>
-            <th>Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((t, i) => (
-            <tr key={i}>
-              <td>{t.date}</td>
-              <td className="desc-cell">{t.description}</td>
-              <td><span className={`badge badge-${t.category}`}>{t.category}</span></td>
-              <td className="amount">${t.amount.toFixed(2)}</td>
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#94a3b8' }}>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+               style={{ marginBottom: '0.75rem', opacity: 0.4 }}>
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </svg>
+          <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#64748b' }}>No transactions match your search</div>
+          {filter && (
+            <button
+              onClick={() => setFilter('')}
+              style={{ marginTop: '0.75rem', padding: '0.35rem 0.85rem', border: '1.5px solid #e2e8f0', borderRadius: '7px', fontSize: '0.8rem', fontWeight: 600, color: '#64748b', background: '#fff', cursor: 'pointer' }}
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+      ) : (
+        <table className="tx-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Description</th>
+              <th>Category</th>
+              <th>Amount</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {filtered.map((t, i) => (
+              <tr key={i}>
+                <td>{t.date}</td>
+                <td className="desc-cell">{t.description}</td>
+                <td><span className={`badge badge-${t.category}`}>{t.category}</span></td>
+                <td className="amount">${t.amount.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
