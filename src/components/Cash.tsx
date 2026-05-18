@@ -177,7 +177,7 @@ export default function Cash() {
           <div className="stat-card">
             <div className="stat-label">Net</div>
             <div className="stat-value" style={{ color: data.net >= 0 ? '#16a34a' : '#dc2626' }}>
-              {data.net >= 0 ? '+' : ''}${data.net.toFixed(2)}
+              {data.net >= 0 ? '+' : '-'}${Math.abs(data.net).toFixed(2)}
             </div>
           </div>
         </div>

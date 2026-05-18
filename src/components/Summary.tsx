@@ -13,7 +13,7 @@ export default function Summary() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="page"><p>Loading...</p></div>;
+  if (loading) return <div className="page"><p>Loading…</p></div>;
   if (error)   return <div className="page"><p className="error">{error}</p></div>;
 
   return (

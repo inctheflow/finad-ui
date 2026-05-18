@@ -57,7 +57,7 @@ export default function Transactions() {
     if (file) handleFile(file);
   };
 
-  if (loading) return <div className="page"><p>Loading...</p></div>;
+  if (loading) return <div className="page"><p>Loading…</p></div>;
   if (error)   return <div className="page"><p className="error">{error}</p></div>;
 
   const q = filter.toLowerCase();
