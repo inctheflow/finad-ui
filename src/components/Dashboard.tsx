@@ -16,6 +16,49 @@ interface Subscription {
   category: string;
 }
 
+// Known subscription service keywords — only descriptions matching one of these
+// (or very tightly recurring amounts in a non-physical category) are shown.
+const SUBSCRIPTION_KEYWORDS = [
+  // Phone / SIM
+  'mint mobile', 'mint.com', 'tmobile', 't-mobile', 'verizon', 'at&t', 'att ',
+  'cricket', 'boost mobile', 'visible', 'metro ', 'consumer cellular', 'straight talk',
+  // Streaming video
+  'netflix', 'hulu', 'disney', 'hbo', 'max ', ' max\b', 'paramount', 'peacock',
+  'apple tv', 'espn', 'espn+', 'youtube premium', 'youtube tv', 'tubi', 'showtime',
+  'starz', 'fubo', 'sling', 'philo', 'directv stream', 'discovery+',
+  // Music
+  'spotify', 'apple music', 'pandora', 'tidal', 'amazon music', 'deezer',
+  'soundcloud', 'sirius', 'xm radio',
+  // Software / Cloud
+  'microsoft 365', 'microsoft 3', 'office 365', 'adobe', 'google one', 'google storage',
+  'dropbox', 'icloud', 'notion', 'grammarly', 'duolingo', 'canva', 'zoom',
+  'slack', '1password', 'lastpass', 'nordvpn', 'expressvpn',
+  // Gaming
+  'xbox', 'playstation', 'nintendo', 'ea play', 'game pass', 'ubisoft', 'steam guard',
+  // News / Reading
+  'nytimes', 'new york times', 'wsj.com', 'washington post', 'the atlantic',
+  'medium.com', 'substack',
+  // Fitness / Wellness
+  'peloton', 'noom', 'calm', 'headspace', 'beachbody', 'myfitnesspal', 'fitbit premium',
+  // Membership / Shopping
+  'amazon prime', 'amazon.com prime', 'costco', "sam's club",
+  // Internet / Cable
+  'comcast', 'spectrum', 'cox ', 'xfinity', 'optimum', 'frontier comm',
+  // Insurance / Finance
+  'lemonade', 'progressive', 'geico', 'state farm',
+];
+
+// Categories that are never subscriptions (physical purchases / one-time fees)
+const EXCLUDED_CATEGORIES = new Set([
+  'fuel', 'gas', 'grocery', 'groceries', 'dining', 'food', 'restaurant', 'shopping', 'education',
+]);
+
+// Descriptions that look like subscriptions but are actually per-use charges
+const BLOCKLIST_KEYWORDS = [
+  'uber eats', 'uber *eats', 'doordash', 'grubhub', 'postmates', 'instacart',
+  'lyft', 'uber trip', 'uber* trip',
+];
+
 function detectSubscriptions(transactions: Transaction[]): Subscription[] {
   const toIso = (d: string) => {
     const [m, day, y] = d.split('/');
@@ -26,10 +69,22 @@ function detectSubscriptions(transactions: Transaction[]): Subscription[] {
   const normalize = (desc: string) =>
     desc.toLowerCase()
         .replace(/#\d+/g, '')
-        .replace(/\b\d{4,}\b/g, '')
+        .replace(/\b\d{5,}\b/g, '')   // strip long numbers (store IDs, order IDs)
         .replace(/[*]/g, '')
         .replace(/\s+/g, ' ')
         .trim();
+
+  const normalize2 = (desc: string) => desc.toLowerCase().replace(/[*]/g, '');
+
+  const isKnownSubscription = (desc: string) => {
+    const lower = normalize2(desc);
+    return SUBSCRIPTION_KEYWORDS.some(kw => lower.includes(kw));
+  };
+
+  const isBlocklisted = (desc: string) => {
+    const lower = normalize2(desc);
+    return BLOCKLIST_KEYWORDS.some(kw => lower.includes(kw.replace(/[*]/g, '')));
+  };
 
   const groups: Record<string, Transaction[]> = {};
   for (const tx of transactions) {
@@ -44,6 +99,18 @@ function detectSubscriptions(transactions: Transaction[]): Subscription[] {
     if (txs.length < 2) continue;
 
     const sorted = txs.slice().sort((a, b) => toMs(a.date) - toMs(b.date));
+    const category = sorted[sorted.length - 1].category.toLowerCase();
+    const desc = sorted[sorted.length - 1].description;
+    const knownSub = isKnownSubscription(desc);
+
+    // Explicitly blocked (per-use services that coincidentally repeat)
+    if (isBlocklisted(desc)) continue;
+
+    // Skip if excluded category and not a recognized subscription service
+    if (EXCLUDED_CATEGORIES.has(category) && !knownSub) continue;
+
+    // Unknown services need 3+ occurrences to establish a real pattern
+    if (!knownSub && sorted.length < 3) continue;
 
     const intervals: number[] = [];
     for (let i = 1; i < sorted.length; i++) {
@@ -53,13 +120,18 @@ function detectSubscriptions(transactions: Transaction[]): Subscription[] {
     const avgInterval = intervals.reduce((s, v) => s + v, 0) / intervals.length;
     if (avgInterval < 5) continue;
 
-    const consistent = intervals.every(d => Math.abs(d - avgInterval) / avgInterval <= 0.4);
+    // Known services get looser interval tolerance; unknowns must be very tight
+    const intervalTolerance = knownSub ? 0.4 : 0.2;
+    const consistent = intervals.every(d => Math.abs(d - avgInterval) / avgInterval <= intervalTolerance);
     if (!consistent) continue;
 
     const amounts = sorted.map(t => t.amount);
     const avgAmount = amounts.reduce((s, v) => s + v, 0) / amounts.length;
     if (avgAmount <= 0) continue;
-    const amountsConsistent = amounts.every(a => Math.abs(a - avgAmount) / avgAmount <= 0.15);
+
+    // Known services get ±8% amount tolerance; unknowns require ±3% (digital billing is exact)
+    const amtTolerance = knownSub ? 0.08 : 0.03;
+    const amountsConsistent = amounts.every(a => Math.abs(a - avgAmount) / avgAmount <= amtTolerance);
     if (!amountsConsistent) continue;
 
     let interval = `Every ~${Math.round(avgInterval)} days`;
@@ -118,6 +190,7 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
   const [maxAmount, setMaxAmount]           = useState('');
   const [filterOpen, setFilterOpen]         = useState(false);
   const [analyticsError, setAnalyticsError] = useState(false);
+  const [subsOpen, setSubsOpen]             = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -593,7 +666,7 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
         </div>
       )}
 
-      {/* ── Subscriptions ──────────────────────────────────────────── */}
+      {/* ── Subscriptions (collapsed by default) ──────────────────── */}
       {(() => {
         const subs = detectSubscriptions(transactions);
         const monthlyTotal = subs.reduce((s, sub) => {
@@ -602,81 +675,115 @@ export default function Dashboard({ onChatOpen }: { onChatOpen?: () => void }) {
         }, 0);
 
         return (
-          <div className="chart-box" style={{ marginTop: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.1rem' }}>
-              <div>
-                <h2 style={{ margin: 0 }}>Recurring Subscriptions</h2>
-                <p style={{ margin: '0.25rem 0 0', fontSize: '0.78rem', color: '#94a3b8' }}>
-                  Auto-detected from your transaction history
-                </p>
-              </div>
-              {subs.length > 0 && (
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '0.72rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Est. monthly cost</div>
-                  <div style={{ fontSize: '1.35rem', fontWeight: 700, color: '#6366f1' }}>${monthlyTotal.toFixed(2)}</div>
-                </div>
-              )}
-            </div>
-
-            {subs.length === 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', gap: '0.5rem' }}>
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <div className="chart-box" style={{ marginTop: '1.5rem', padding: 0, overflow: 'hidden' }}>
+            {/* Header — always visible, acts as toggle */}
+            <button
+              onClick={() => setSubsOpen(o => !o)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.95rem 1.25rem',
+                background: 'none', border: 'none', cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/>
                   <path d="M12 8v4l3 3"/>
                 </svg>
-                <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>No recurring charges detected yet.</p>
-                <p style={{ color: '#cbd5e1', fontSize: '0.78rem', margin: 0 }}>Upload more transactions to identify patterns.</p>
+                <span style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1e293b' }}>Recurring Subscriptions</span>
+                {subs.length > 0 && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    minWidth: '20px', height: '20px', borderRadius: '999px',
+                    background: '#eef2ff', color: '#6366f1',
+                    fontSize: '0.72rem', fontWeight: 700, padding: '0 5px',
+                  }}>
+                    {subs.length}
+                  </span>
+                )}
               </div>
-            ) : (
-              <table className="tx-table" style={{ marginTop: '1rem' }}>
-                <thead>
-                  <tr>
-                    <th>Service</th>
-                    <th>Category</th>
-                    <th>Interval</th>
-                    <th>Amount</th>
-                    <th>Last charged</th>
-                    <th>Total spent</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subs.map((sub, i) => (
-                    <tr key={i}>
-                      <td className="desc-cell" style={{ fontWeight: 600, color: '#1e293b' }}>{sub.name}</td>
-                      <td><span className={`badge badge-${sub.category}`}>{sub.category}</span></td>
-                      <td>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
-                          padding: '0.2rem 0.65rem',
-                          borderRadius: '999px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          background: '#f0fdf4',
-                          color: '#16a34a',
-                          border: '1px solid #bbf7d0',
-                        }}>
-                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/>
-                            <path d="M12 8v4l3 3"/>
-                          </svg>
-                          {sub.interval}
-                        </span>
-                      </td>
-                      <td className="amount" style={{ fontWeight: 700, color: '#ef4444' }}>${sub.amount.toFixed(2)}</td>
-                      <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{sub.lastCharged}</td>
-                      <td style={{ color: '#475569', fontWeight: 600 }}>${sub.totalSpent.toFixed(2)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: '2px solid #e2e8f0' }}>
-                    <td colSpan={5} style={{ fontWeight: 700, color: '#475569', fontSize: '0.85rem', padding: '0.6rem 0.75rem' }}>Total paid</td>
-                    <td style={{ fontWeight: 700, color: '#1e293b', padding: '0.6rem 0.75rem', textAlign: 'right' }}>
-                      ${subs.reduce((s, sub) => s + sub.totalSpent, 0).toFixed(2)}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {subs.length > 0 && (
+                  <span style={{ fontSize: '0.82rem', color: '#6366f1', fontWeight: 700 }}>
+                    ~${monthlyTotal.toFixed(2)}/mo
+                  </span>
+                )}
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="#94a3b8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transform: subsOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+                >
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </div>
+            </button>
+
+            {/* Expandable content */}
+            {subsOpen && (
+              <div style={{ borderTop: '1px solid #e2e8f0', padding: '0 1.25rem 1.25rem' }}>
+                {subs.length === 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem 1rem', gap: '0.5rem' }}>
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/>
+                      <path d="M12 8v4l3 3"/>
+                    </svg>
+                    <p style={{ color: '#94a3b8', fontSize: '0.875rem', margin: 0 }}>No recurring subscriptions detected.</p>
+                    <p style={{ color: '#cbd5e1', fontSize: '0.78rem', margin: 0 }}>Upload more transactions to identify patterns.</p>
+                  </div>
+                ) : (
+                  <table className="tx-table" style={{ marginTop: '1rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Service</th>
+                        <th>Category</th>
+                        <th>Interval</th>
+                        <th>Amount</th>
+                        <th>Last charged</th>
+                        <th>Total spent</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {subs.map((sub, i) => (
+                        <tr key={i}>
+                          <td className="desc-cell" style={{ fontWeight: 600, color: '#1e293b' }}>{sub.name}</td>
+                          <td><span className={`badge badge-${sub.category}`}>{sub.category}</span></td>
+                          <td>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                              padding: '0.2rem 0.65rem',
+                              borderRadius: '999px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: '#f0fdf4',
+                              color: '#16a34a',
+                              border: '1px solid #bbf7d0',
+                            }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M3 12a9 9 0 1 0 18 0 9 9 0 0 0-18 0"/>
+                                <path d="M12 8v4l3 3"/>
+                              </svg>
+                              {sub.interval}
+                            </span>
+                          </td>
+                          <td className="amount" style={{ fontWeight: 700, color: '#ef4444' }}>${sub.amount.toFixed(2)}</td>
+                          <td style={{ color: '#64748b', fontSize: '0.85rem' }}>{sub.lastCharged}</td>
+                          <td style={{ color: '#475569', fontWeight: 600 }}>${sub.totalSpent.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid #e2e8f0' }}>
+                        <td colSpan={5} style={{ fontWeight: 700, color: '#475569', fontSize: '0.85rem', padding: '0.6rem 0.75rem' }}>Total paid</td>
+                        <td style={{ fontWeight: 700, color: '#1e293b', padding: '0.6rem 0.75rem', textAlign: 'right' }}>
+                          ${subs.reduce((s, sub) => s + sub.totalSpent, 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
+              </div>
             )}
           </div>
         );
